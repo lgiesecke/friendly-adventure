@@ -1,0 +1,126 @@
+categoryFilter === 'all' || episode.category === categoryFilter;
+                        return (searchTerm ? titleMatch : true) && durationMatch && categoryMatch;
+                    });
+
+                    const podcastTitleMatch = podcast.title.toLowerCase().includes(searchTerm);
+                    const authorMatch = podcast.author.toLowerCase().includes(searchTerm);
+
+                    if ((searchTerm && (podcastTitleMatch || authorMatch)) || filteredEpisodes.length > 0) {
+                        // If podcast meta matches, show all its episodes that pass other filters (duration/category)
+                        // OR if any episode title matches, show those.
+                        // For simplicity if podcast meta matches, we show its filtered episodes.
+                        // If only an episode title matches but not podcast meta, we still show that podcast with just matching episodes.
+                        
+                        let episodesToShow = filteredEpisodes;
+                        if (searchTerm && (podcastTitleMatch || authorMatch) && filteredEpisodes.length === 0 && !podcast.episodes.some(ep => ep.title.toLowerCase().includes(searchTerm))) {
+                            // If podcast meta matches search, but no episodes match ALL filters (search for episode title + duration + category),
+                            // then re-filter episodes only by duration and category to show something for the matched podcast.
+                            episodesToShow = podcast.episodes.filter(episode => {
+                                const durationMatch = (() => { /* ... same as above ... */ })();
+                                const categoryMatch = categoryFilter === 'all' || episode.category === categoryFilter;
+                                return durationMatch && categoryMatch;
+                            });
+                        }
+
+
+                        if (episodesToShow.length > 0) {
+                             return { ...podcast, episodes: episodesToShow };
+                        }
+                    }
+                    return null;
+                }).filter(Boolean);
+            },
+
+            createPodcastCardElement(podcast) {
+                const card = document.createElement('div');
+                card.className = 'podcast-card';
+                card.innerHTML = `
+                    <div class="podcast-info">
+                        <img src="${podcast.image}" alt="${podcast.title}" class="podcast-image">
+                        <div class="podcast-details">
+                            <h2>${podcast.title}</h2>
+                            <p>${podcast.author}</p>
+                        </div>
+                    </div>
+                    <div class="episodes-carousel-container">
+                        <h3>Episodes</h3>
+                        <div class="episodes-carousel">
+                            ${podcast.episodes.map(ep => this.createEpisodeCardHTML(ep, podcast)).join('')}
+                        </div>
+                    </div>
+                `;
+                return card;
+            },
+
+            createEpisodeCardHTML(episode, podcast) {
+                return `
+                    <div class="episode-card" data-podcast-id="${podcast.id}" data-episode-id="${episode.id}">
+                        <h4 class="episode-card-title">${episode.title}</h4>
+                        <p class="episode-card-meta">${this.formatDuration(episode.duration)} &bull; ${episode.category}</p>
+                        <button class="episode-play-button" data-podcast-id="${podcast.id}" data-episode-id="${episode.id}" aria-label="Play ${episode.title}">
+                            <span class="icon">▶️</span>
+                        </button>
+                    </div>
+                `;
+            },
+            
+            updateAllEpisodeCardUIs() {
+                document.querySelectorAll('.episode-card').forEach(cardElement => {
+                    const podcastId = cardElement.dataset.podcastId;
+                    const episodeId = cardElement.dataset.episodeId;
+                    const button = cardElement.querySelector('.episode-play-button');
+                    if (!button) return;
+
+                    let iconHTML = '<span class="icon">▶️</span>'; // Default: Play
+                    button.classList.remove('playing');
+
+                    if (this.state.currentEpisode && this.state.currentEpisode.episodeId === episodeId) {
+                        if (this.state.isLoading) {
+                            iconHTML = '<span class="loading-indicator"></span>';
+                        } else if (this.state.isPlaying) {
+                            iconHTML = '<span class="icon">⏸️</span>';
+                            button.classList.add('playing');
+                        } else { // Paused but selected
+                            iconHTML = '<span class="icon">▶️</span>';
+                        }
+                    }
+                    button.innerHTML = iconHTML;
+                });
+            },
+
+            updateMiniPlayerUI() {
+                if (this.state.currentEpisode && this.state.isMiniPlayerCommitted) {
+                    this.elements.miniPlayer.classList.remove('hidden');
+                    this.elements.miniPlayerImage.src = this.state.currentEpisode.podcastImage;
+                    this.elements.miniPlayerEpisodeTitle.textContent = this.state.currentEpisode.title;
+                    this.elements.miniPlayerPodcastTitle.textContent = this.state.currentEpisode.podcastTitle;
+                    
+                    const playPauseButton = this.elements.miniPlayerPlayPause;
+                    playPauseButton.classList.remove('playing');
+                    if (this.state.isLoading) {
+                        playPauseButton.innerHTML = '<span class="loading-indicator"></span>'; // Use a smaller spinner or text
+                    } else if (this.state.isPlaying) {
+                        playPauseButton.innerHTML = '<span class="icon">⏸️</span>';
+                        playPauseButton.classList.add('playing');
+                    } else {
+                        playPauseButton.innerHTML = '<span class="icon">▶️</span>';
+                    }
+                } else {
+                    this.elements.miniPlayer.classList.add('hidden');
+                }
+            },
+
+            formatDuration(totalSeconds) {
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                const pad = (num) => String(num).padStart(2, '0');
+                if (hours > 0) return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+                return `${minutes}:${pad(seconds)}`;
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => PodcastApp.init());
+    </script>
+</body>
+</html>
