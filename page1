@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Discovery</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --background-color: #f0f2f5;
+            --card-background: #ffffff;
+            --text-color: #212529;
+            --light-text-color: #495057;
+            --border-color: #dee2e6;
+            --play-indicator-color: #28a745;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --border-radius: 8px;
+            --thumb-target-size: 44px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            padding-bottom: 80px; /* Space for mini-player */
+        }
+
+        .app-header {
+            background-color: var(--card-background);
+            padding: 1rem 1.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .app-header h1 {
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+            text-align: center;
+        }
+
+        #searchInput {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .filters {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .filters select {
+            flex-grow: 1;
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            background-color: white;
+            font-size: 0.9rem;
+            min-width: 120px; /* Ensure dropdowns are usable */
+        }
+
+        .podcast-grid-container {
+            flex-grow: 1;
+            padding: 1rem;
+            display: grid;
+            gap: 1.5rem;
+            grid-template-columns: 1fr; /* Mobile: single column */
+        }
+
+        .podcast-card {
+            background-color: var(--card-background);
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            overflow: hidden;
+        }
+
+        .podcast-info {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .podcast-image {
+            width: 60px;
+            height: 60px;
+            border-radius: var(--border-radius);
+            margin-right: 1rem;
+            object-fit: cover;
+        }
+
+        .podcast-details h2 {
+            font-size: 1.1rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .podcast-details p {
+            font-size: 0.85rem;
+            color: var(--light-text-color);
+        }
+
+        .episodes-carousel-container {
+             padding: 0.5rem 0 1rem 1rem; /* Left padding for first card */
+        }
+        
+        .episodes-carousel-container h3 {
+            font-size: 1rem;
+            margin-bottom: 0.75rem;
+            padding-right: 1rem; /* Ensure title doesn't overlap scrollbar */
+        }
+
+        .episodes-carousel {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+            gap: 1rem;
+            padding-bottom: 0.5rem; /* Space for scrollbar */
+        }
+         /* Hide scrollbar for a cleaner look, but ensure it's scrollable */
+        .episodes-carousel::-webkit-scrollbar {
+            height: 8px;
+        }
+        .episodes-carousel::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 4px;
+        }
+        .episodes-carousel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+
+        .episode-card {
+            flex: 0 0 280px; /* Fixed width for episode cards */
+            scroll-snap-align: start;
+            background-color: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 0.75rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 150px; /* Ensure consistent height */
+        }
+        .episode-card:last-child {
+            margin-right: 1rem; /* Ensure last card has padding from edge */
+        }
+
+
+        .episode-card-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-height: 2.4em; /* Approx 2 lines */
+        }
+
+        .episode-card-meta {
+            font-size: 0.8rem;
+            color: var(--light-text-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .episode-play-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            min-height: var(--thumb-target-size);
+            min-width: var(--thumb-target-size);
+            align-self: flex-start; /* Align button to the start of flex item */
+        }
+
+        .episode-play-button:hover {
+            background-color: #0056b3;
+        }
+        .episode-play-button:active {
+            transform: scale(0.95);
+        }
+
+        .episode-play-button .icon {
+            font-size: 1.2em;
+        }
+        
+        .episode-play-button.playing .icon,
+        .mini-player-controls button.playing .icon {
+            animation: pulseAnimation 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulseAnimation {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        
+        .loading-indicator {
+            width: 1em;
+            height: 1em;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+
+        /* Mini Player */
+        .mini-player {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: var(--card-background);
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 200;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .mini-player.hidden {
+            transform: translateY(100%);
+        }
+
+        .mini-player-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            overflow: hidden; /* Prevent text overflow issues */
+        }
+        
+        .mini-player-artwork {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        .mini-player-details .episode-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .mini-player-details .podcast-title {
+            font-size: 0.8rem;
+            color: var(--light-text-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .mini-player-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .mini-player-controls button {
+            background: none;
+            border: none;
+            font-size: 1.5rem; /* Larger icons */
+            color: var(--text-color);
+            cursor: pointer;
+            padding: 0.25rem; /* Small padding for easier clicking */
+            min-width: var(--thumb-target-size);
+            min-height: var(--thumb-target-size);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mini-player-controls button:hover {
+            color: var(--primary-color);
+        }
+
+        /* Desktop adjustments */
+        @media (min-width: 768px) {
+            .app-header {
+                padding: 1.5rem 2rem;
+            }
+            .app-header h1 {
+                text-align: left;
+            }
+             .header-content { /* Optional: group search and filters */
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 1rem;
+            }
+            #searchInput {
+                margin-bottom: 0;
+                max-width: 300px; /* Limit search bar width */
+            }
+            .filters {
+                justify-content: flex-end; /* Align filters to the right */
+                flex-wrap: nowrap;
+            }
+            .filters select {
+                flex-grow: 0; /* Don't let selects grow too much */
+            }
+
+            .podcast-grid-container {
+                grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); /* Responsive grid */
+                padding: 1.5rem 2rem;
+            }
+            
+            .episode-card {
+                flex: 0 0 250px; /* Slightly smaller on desktop if needed */
+            }
+            .mini-player {
+                max-width: 500px; /* Limit mini-player width on large screens */
+                left: 50%;
+                transform: translateX(-50%);
+                bottom: 1rem; /* Float it a bit */
+                border-radius: var(--border-radius);
+            }
+            .mini-player.hidden {
+                transform: translateX(-50%) translateY(150%);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>Podcast Discovery</h1>
+            <div class="header-content">
+                <input type="search" id="searchInput" placeholder="Search...">
+                <div class="filters">
+                    <select id="durationFilter">
+                        <option value="all">All Durations</option>
+                        <option value="short">Short (<30m)</option>
+                        <option value="medium">Medium (30-60m)</option>
+                        <option value="long">Long (>60m)</option>
+                    </select>
+                    <select id="categoryFilter">
+                        <option value="all">All Categories</option>
+                    </select>
+                </div>
+            </div>
+        </header>
+
+        <main id="podcastGridContainer" class="podcast-grid-container">
+            <!-- Podcast cards will be injected here -->
+        </main>
+
+        <div id="miniPlayer" class="mini-player hidden">
+            <div class="mini-player-info">
+                <img id="miniPlayerImage" src="https://via.placeholder.com/80" alt="Episode artwork" class="mini-player-artwork">
+                <div class="mini-player-details">
+                    <p id="miniPlayerEpisodeTitle" class="episode-title">Episode Title</p>
+                    <p id="miniPlayerPodcastTitle" class="podcast-title">Podcast Title</p>
+                </div>
+            </div>
+            <div class="mini-player-controls">
+                <button id="miniPlayerPlayPause" aria-label="Play/Pause"><span class="icon">▶️</span></button>
+                <button id="miniPlayerClose" aria-label="Close player">❌</button>
+            </div>
+        </div>
+
+        <audio id="audioPlayer" preload="metadata"></audio>
+    </div>
+
+    <script>
+        const PodcastApp = {
+            podcastsData: [
+                {
+                    id: 'podcast1',
+                    title: 'Tech Unveiled',
+                    author: 'Alex Bytes',
+                    image: 'https://via.placeholder.com/300x300.png?text=Tech+Unveiled',
+                    episodes: [
+                        { id: 'ep1-1', title: 'The Future of AI: Beyond ChatGPT', duration: 1700, category: 'Technology', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', description: 'Exploring next-gen AI.' },
+                        { id: 'ep1-2', title: 'Decentralized Web: Hype vs. Reality', duration: 2500, category: 'Web3', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3', description: 'A balanced look at Web3.' },
+                        { id: 'ep1-3', title: 'Quantum Computing Explained Simply', duration: 3700, category: 'Technology', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3', description: 'Understanding quantum leaps.' }
+                    ]
+                },
+                {
+                    id: 'podcast2',
+                    title: 'Creative Spark',
+                    author: 'Jamie Palette',
+                    image: 'https://via.placeholder.com/300x300.png?text=Creative+Spark',
+                    episodes: [
+                        { id: 'ep2-1', title: 'Finding Your Artistic Voice', duration: 1500, category: 'Creativity', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3', description: 'Discover your unique style.' },
+                        { id: 'ep2-2', title: 'Monetizing Your Art Online', duration: 2800, category: 'Business', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3', description: 'Turning passion into profit.' },
+                        { id: 'ep2-3', title: 'The Science of Storytelling', duration: 4000, category: 'Creativity', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3', description: 'Crafting compelling narratives.' }
+                    ]
+                },
+                {
+                    id: 'podcast3',
+                    title: 'Wellness Waves',
+                    author: 'Dr. Serene Mind',
+                    image: 'https://via.placeholder.com/300x300.png?text=Wellness+Waves',
+                    episodes: [
+                        { id: 'ep3-1', title: 'Mindfulness in Minutes', duration: 1200, category: 'Wellness', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3', description: 'Quick mindfulness exercises.' },
+                        { id: 'ep3-2', title: 'Nutrition Myths Debunked', duration: 3200, category: 'Health', audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3', description: 'Separating fact from fiction.' },
+                    ]
+                }
+            ],
+
+            config: {
+                shortDurationMax: 30 * 60,
+                mediumDurationMax: 60 * 60,
+            },
+
+            state: {
+                currentEpisode: null, // { podcastId, episodeId, podcastImage, podcastTitle, episodeTitle, audioUrl }
+                isPlaying: false,
+                isLoading: false,
+                isMiniPlayerCommitted: false, // True if played via click, making mini-player "sticky"
+                hoverPreviewTimeout: null, // For desktop hover preview
+            },
+
+            elements: {},
+
+            init() {
+                this.cacheDOMElements();
+                this.populateCategoryFilter();
+                this.attachEventListeners();
+                this.renderPodcasts();
+            },
+
+            cacheDOMElements() {
+                this.elements.searchInput = document.getElementById('searchInput');
+                this.elements.durationFilter = document.getElementById('durationFilter');
+                this.elements.categoryFilter = document.getElementById('categoryFilter');
+                this.elements.podcastGridContainer = document.getElementById('podcastGridContainer');
+                this.elements.miniPlayer = document.getElementById('miniPlayer');
+                this.elements.miniPlayerImage = document.getElementById('miniPlayerImage');
+                this.elements.miniPlayerEpisodeTitle = document.getElementById('miniPlayerEpisodeTitle');
+                this.elements.miniPlayerPodcastTitle = document.getElementById('miniPlayerPodcastTitle');
+                this.elements.miniPlayerPlayPause = document.getElementById('miniPlayerPlayPause');
+                this.elements.miniPlayerClose = document.getElementById('miniPlayerClose');
+                this.elements.audioPlayer = document.getElementById('audioPlayer');
+            },
+
+            populateCategoryFilter() {
+                const categories = new Set();
+                this.podcastsData.forEach(podcast => {
+                    podcast.episodes.forEach(episode => categories.add(episode.category));
+                });
+                Array.from(categories).sort().forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    this.elements.categoryFilter.appendChild(option);
+                });
+            },
+
+            attachEventListeners() {
+                this.elements.searchInput.addEventListener('input', () => this.renderPodcasts());
+                this.elements.durationFilter.addEventListener('change', () => this.renderPodcasts());
+                this.elements.categoryFilter.addEventListener('change', () => this.renderPodcasts());
+
+                this.elements.podcastGridContainer.addEventListener('click', this.handleEpisodeCardAction.bind(this));
+                
+                // Desktop hover preview
+                if (!('ontouchstart' in window)) { // Basic check for non-touch devices
+                    this.elements.podcastGridContainer.addEventListener('mouseover', this.handleEpisodeCardHover.bind(this));
+                    this.elements.podcastGridContainer.addEventListener('mouseout', this.handleEpisodeCardHoverEnd.bind(this));
+                }
+
+                this.elements.miniPlayerPlayPause.addEventListener('click', this.toggleMiniPlayerPlayPause.bind(this));
+                this.elements.miniPlayerClose.addEventListener('click', this.closeMiniPlayer.bind(this));
+
+                this.elements.audioPlayer.addEventListener('play', this.onAudioPlay.bind(this));
+                this.elements.audioPlayer.addEventListener('pause', this.onAudioPause.bind(this));
+                this.elements.audioPlayer.addEventListener('ended', this.onAudioEnded.bind(this));
+                this.elements.audioPlayer.addEventListener('loadstart', this.onAudioLoadStart.bind(this));
+                this.elements.audioPlayer.addEventListener('canplay', this.onAudioCanPlay.bind(this));
+                this.elements.audioPlayer.addEventListener('error', this.onAudioError.bind(this));
+            },
+            
+            getEpisodeFullData(podcastId, episodeId) {
+                const podcast = this.podcastsData.find(p => p.id === podcastId);
+                if (!podcast) return null;
+                const episode = podcast.episodes.find(ep => ep.id === episodeId);
+                if (!episode) return null;
+                return {
+                    ...episode,
+                    podcastId: podcast.id,
+                    podcastTitle: podcast.title,
+                    podcastImage: podcast.image,
+                };
+            },
+
+            handleEpisodeCardAction(event) {
+                const button = event.target.closest('.episode-play-button');
+                if (!button) return;
+
+                const podcastId = button.dataset.podcastId;
+                const episodeId = button.dataset.episodeId;
+                const episodeData = this.getEpisodeFullData(podcastId, episodeId);
+
+                if (!episodeData) return;
+
+                if (this.state.currentEpisode && this.state.currentEpisode.episodeId === episodeId) {
+                    if (this.state.isPlaying) {
+                        this.elements.audioPlayer.pause();
+                    } else {
+                        this.elements.audioPlayer.play().catch(e => console.error("Play error:", e));
+                    }
+                } else {
+                    this.playEpisode(episodeData);
+                }
+                this.state.isMiniPlayerCommitted = true; // Click commits to mini-player
+                this.updateMiniPlayerUI();
+            },
+            
+            handleEpisodeCardHover(event) {
+                const button = event.target.closest('.episode-play-button');
+                if (!button || this.state.isMiniPlayerCommitted && this.state.isPlaying) return; // Don't hover-preview if main track is playing
+
+                if (this.state.hoverPreviewTimeout) clearTimeout(this.state.hoverPreviewTimeout);
+
+                this.state.hoverPreviewTimeout = setTimeout(() => {
+                    const podcastId = button.dataset.podcastId;
+                    const episodeId = button.dataset.episodeId;
+                    
+                    // Don't start hover play if it's the current main playing episode
+                    if (this.state.currentEpisode && this.state.currentEpisode.episodeId === episodeId && this.state.isMiniPlayerCommitted) {
+                        return;
+                    }
+
+                    const episodeData = this.getEpisodeFullData(podcastId, episodeId);
+                    if (!episodeData) return;
+                    
+                    // If different episode or nothing playing via commit, preview it
+                    if (!this.state.currentEpisode || this.state.currentEpisode.episodeId !== episodeId || !this.state.isMiniPlayerCommitted) {
+                         if(this.elements.audioPlayer.src !== episodeData.audioUrl) {
+                            this.state.currentEpisode = episodeData; // Tentatively set for preview
+                            this.elements.audioPlayer.src = episodeData.audioUrl;
+                         }
+                         this.elements.audioPlayer.play().catch(e => console.error("Hover play error:", e));
+                         this.state.isMiniPlayerCommitted = false; // Hover play is not committed
+                         this.updateAllEpisodeCardUIs(); // Update button to show loading/pause
+                    }
+                }, 200); // Small delay to prevent accidental hovers
+            },
+
+            handleEpisodeCardHoverEnd(event) {
+                 const button = event.target.closest('.episode-play-button');
+                 if (this.state.hoverPreviewTimeout) clearTimeout(this.state.hoverPreviewTimeout);
+
+                 // If we were hover-previewing (not committed play) and mouse leaves the button area
+                 if (button && !this.state.isMiniPlayerCommitted && this.state.currentEpisode && this.state.currentEpisode.episodeId === button.dataset.episodeId) {
+                    this.elements.audioPlayer.pause();
+                    // Don't reset currentEpisode here, as another hover might pick it up or click might commit it.
+                    // UI will update via onAudioPause
+                 }
+            },
+
+            playEpisode(episodeData) {
+                this.state.currentEpisode = episodeData;
+                this.elements.audioPlayer.src = episodeData.audioUrl;
+                this.elements.audioPlayer.play().catch(e => console.error("Play error:", e));
+                // isMiniPlayerCommitted will be set by the caller if it's a click
+            },
+
+            toggleMiniPlayerPlayPause() {
+                if (!this.state.currentEpisode) return;
+                if (this.state.isPlaying) {
+                    this.elements.audioPlayer.pause();
+                } else {
+                    this.elements.audioPlayer.play().catch(e => console.error("Play error:", e));
+                }
+            },
+
+            closeMiniPlayer() {
+                this.elements.audioPlayer.pause();
+                this.state.currentEpisode = null;
+                this.state.isPlaying = false;
+                this.state.isLoading = false;
+                this.state.isMiniPlayerCommitted = false;
+                this.updateMiniPlayerUI();
+                this.updateAllEpisodeCardUIs();
+            },
+            
+            // --- Audio Event Handlers ---
+            onAudioPlay() {
+                this.state.isPlaying = true;
+                this.state.isLoading = false;
+                this.updateMiniPlayerUI();
+                this.updateAllEpisodeCardUIs();
+            },
+            onAudioPause() {
+                this.state.isPlaying = false;
+                this.state.isLoading = false;
+                 // If paused during a non-committed hover, effectively clear it
+                if (!this.state.isMiniPlayerCommitted) {
+                   // this.state.currentEpisode = null; // Optional: clear if hover ends and pauses
+                }
+                this.updateMiniPlayerUI();
+                this.updateAllEpisodeCardUIs();
+            },
+            onAudioEnded() {
+                this.state.isPlaying = false;
+                // Simple: treat as pause. Could implement auto-play next.
+                if (this.state.isMiniPlayerCommitted) { // If it was a committed play, keep mini-player, show as paused
+                   this.updateMiniPlayerUI();
+                } else { // If it was a hover preview, clear it
+                   this.state.currentEpisode = null;
+                   this.updateMiniPlayerUI();
+                }
+                this.updateAllEpisodeCardUIs();
+            },
+            onAudioLoadStart() {
+                this.state.isLoading = true;
+                this.updateMiniPlayerUI(); // Potentially show loading on mini-player too
+                this.updateAllEpisodeCardUIs();
+            },
+            onAudioCanPlay() {
+                this.state.isLoading = false;
+                this.updateMiniPlayerUI();
+                this.updateAllEpisodeCardUIs();
+            },
+            onAudioError() {
+                console.error("Audio Error:", this.elements.audioPlayer.error);
+                this.state.isLoading = false;
+                this.state.isPlaying = false;
+                // Potentially show an error state
+                this.updateMiniPlayerUI();
+                this.updateAllEpisodeCardUIs();
+            },
+
+            // --- UI Rendering ---
+            renderPodcasts() {
+                const filteredPodcasts = this.getFilteredData();
+                this.elements.podcastGridContainer.innerHTML = '';
+                if (filteredPodcasts.length === 0) {
+                    this.elements.podcastGridContainer.innerHTML = '<p>No podcasts found matching your criteria.</p>';
+                    return;
+                }
+                filteredPodcasts.forEach(podcast => {
+                    const podcastCard = this.createPodcastCardElement(podcast);
+                    this.elements.podcastGridContainer.appendChild(podcastCard);
+                });
+                this.updateAllEpisodeCardUIs(); // Ensure new cards have correct UI state
+            },
+
+            getFilteredData() {
+                const searchTerm = this.elements.searchInput.value.toLowerCase();
+                const durationFilter = this.elements.durationFilter.value;
+                const categoryFilter = this.elements.categoryFilter.value;
+
+                return this.podcastsData.map(podcast => {
+                    const filteredEpisodes = podcast.episodes.filter(episode => {
+                        const titleMatch = episode.title.toLowerCase().includes(searchTerm);
+                        const durationMatch = (() => {
+                            if (durationFilter === 'all') return true;
+                            const durationMinutes = episode.duration / 60;
+                            if (durationFilter === 'short') return durationMinutes < (this.config.shortDurationMax / 60);
+                            if (durationFilter === 'medium') return durationMinutes >= (this.config.shortDurationMax / 60) && durationMinutes <= (this.config.mediumDurationMax / 60);
+                            if (durationFilter === 'long') return durationMinutes > (this.config.mediumDurationMax / 60);
+                            return true;
+                        })();
+                        const categoryMatch = categoryFilter === 'all' || episode.category === categoryFilter;
+                        return (searchTerm ? titleMatch : true) && durationMatch && categoryMatch;
+                    });
+
+                    const podcastTitleMatch = podcast.title.toLowerCase().includes(searchTerm);
+                    const authorMatch = podcast.author.toLowerCase().includes(searchTerm);
+
+                    if ((searchTerm && (podcastTitleMatch || authorMatch)) || filteredEpisodes.length > 0) {
+                        // If podcast meta matches, show all its episodes that pass other filters (duration/category)
+                        // OR if any episode title matches, show those.
+                        // For simplicity if podcast meta matches, we show its filtered episodes.
+                        // If only an episode title matches but not podcast meta, we still show that podcast with just matching episodes.
+                        
+                        let episodesToShow = filteredEpisodes;
+                        if (searchTerm && (podcastTitleMatch || authorMatch) && filteredEpisodes.length === 0 && !podcast.episodes.some(ep => ep.title.toLowerCase().includes(searchTerm))) {
+                            // If podcast meta matches search, but no episodes match ALL filters (search for episode title + duration + category),
+                            // then re-filter episodes only by duration and category to show something for the matched podcast.
+                            episodesToShow = podcast.episodes.filter(episode => {
+                                const durationMatch = (() => { /* ... same as above ... */ })();
+                                const categoryMatch = categoryFilter === 'all' || episode.category === categoryFilter;
+                                return durationMatch && categoryMatch;
+                            });
+                        }
+
+
+                        if (episodesToShow.length > 0) {
+                             return { ...podcast, episodes: episodesToShow };
+                        }
+                    }
+                    return null;
+                }).filter(Boolean);
+            },
+
+            createPodcastCardElement(podcast) {
+                const card = document.createElement('div');
+                card.className = 'podcast-card';
+                card.innerHTML = `
+                    <div class="podcast-info">
+                        <img src="${podcast.image}" alt="${podcast.title}" class="podcast-image">
+                        <div class="podcast-details">
+                            <h2>${podcast.title}</h2>
+                            <p>${podcast.author}</p>
+                        </div>
+                    </div>
+                    <div class="episodes-carousel-container">
+                        <h3>Episodes</h3>
+                        <div class="episodes-carousel">
+                            ${podcast.episodes.map(ep => this.createEpisodeCardHTML(ep, podcast)).join('')}
+                        </div>
+                    </div>
+                `;
+                return card;
+            },
+
+            createEpisodeCardHTML(episode, podcast) {
+                return `
+                    <div class="episode-card" data-podcast-id="${podcast.id}" data-episode-id="${episode.id}">
+                        <h4 class="episode-card-title">${episode.title}</h4>
+                        <p class="episode-card-meta">${this.formatDuration(episode.duration)} &bull; ${episode.category}</p>
+                        <button class="episode-play-button" data-podcast-id="${podcast.id}" data-episode-id="${episode.id}" aria-label="Play ${episode.title}">
+                            <span class="icon">▶️</span>
+                        </button>
+                    </div>
+                `;
+            },
+            
+            updateAllEpisodeCardUIs() {
+                document.querySelectorAll('.episode-card').forEach(cardElement => {
+                    const podcastId = cardElement.dataset.podcastId;
+                    const episodeId = cardElement.dataset.episodeId;
+                    const button = cardElement.querySelector('.episode-play-button');
+                    if (!button) return;
+
+                    let iconHTML = '<span class="icon">▶️</span>'; // Default: Play
+                    button.classList.remove('playing');
+
+                    if (this.state.currentEpisode && this.state.currentEpisode.episodeId === episodeId) {
+                        if (this.state.isLoading) {
+                            iconHTML = '<span class="loading-indicator"></span>';
+                        } else if (this.state.isPlaying) {
+                            iconHTML = '<span class="icon">⏸️</span>';
+                            button.classList.add('playing');
+                        } else { // Paused but selected
+                            iconHTML = '<span class="icon">▶️</span>';
+                        }
+                    }
+                    button.innerHTML = iconHTML;
+                });
+            },
+
+            updateMiniPlayerUI() {
+                if (this.state.currentEpisode && this.state.isMiniPlayerCommitted) {
+                    this.elements.miniPlayer.classList.remove('hidden');
+                    this.elements.miniPlayerImage.src = this.state.currentEpisode.podcastImage;
+                    this.elements.miniPlayerEpisodeTitle.textContent = this.state.currentEpisode.title;
+                    this.elements.miniPlayerPodcastTitle.textContent = this.state.currentEpisode.podcastTitle;
+                    
+                    const playPauseButton = this.elements.miniPlayerPlayPause;
+                    playPauseButton.classList.remove('playing');
+                    if (this.state.isLoading) {
+                        playPauseButton.innerHTML = '<span class="loading-indicator"></span>'; // Use a smaller spinner or text
+                    } else if (this.state.isPlaying) {
+                        playPauseButton.innerHTML = '<span class="icon">⏸️</span>';
+                        playPauseButton.classList.add('playing');
+                    } else {
+                        playPauseButton.innerHTML = '<span class="icon">▶️</span>';
+                    }
+                } else {
+                    this.elements.miniPlayer.classList.add('hidden');
+                }
+            },
+
+            formatDuration(totalSeconds) {
+                const hours = Math.floor(totalSeconds / 3600);
+                const minutes = Math.floor((totalSeconds % 3600) / 60);
+                const seconds = totalSeconds % 60;
+                const pad = (num) => String(num).padStart(2, '0');
+                if (hours > 0) return `${hours}:${pad(minutes)}:${pad(seconds)}`;
+                return `${minutes}:${pad(seconds)}`;
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => PodcastApp.init());
+    </script>
+</body>
+</html>
