@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Podcast Discovery</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <style>
+    :root {
+      --primary: #1976D2;
+      --accent: #FFB300;
+      --bg: #f5f5f7;
+      --card-bg: #fff;
+      --text: #222;
+      --radius: 18px;
+      --shadow: 0 4px 20px rgba(25, 118, 210, 0.07);
+      --mini-player-height: 72px;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', Arial, sans-serif;
+      min-height: 100vh;
+      padding-bottom: var(--mini-player-height);
+    }
+    header {
+      background: var(--primary);
+      color: #fff;
+      padding: 1.1rem 1rem 0.7rem 1rem;
+      text-align: center;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .filters {
+      display: flex;
+      gap: 0.7rem;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 1.1rem 0 0.5rem 0;
+      padding: 0 1rem;
+    }
+    .filters select,
+    .filters input[type="search"] {
+      border: 1.5px solid #d3d3d3;
+      border-radius: 12px;
+      font-size: 1rem;
+      padding: 0.5em 0.8em;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+      margin-right: 0.2rem;
+      max-width: 130px;
+      min-width: 85px;
+      appearance: none;
+      transition: border 0.2s;
+    }
+    .filters select:focus,
+    .filters input[type="search"]:focus {
+      border: 1.5px solid var(--primary);
+    }
+    main {
+      padding: 0.5rem 0.5rem 1rem 0.5rem;
+      margin: 0 auto;
+      max-width: 600px;
+      min-height: 60vh;
+    }
+    .cards-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.1rem;
+    }
+    @media (min-width: 600px) {
+      .cards-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    @media (min-width: 900px) {
+      main {
+        max-width: 970px;
+      }
+      .cards-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: box-shadow 0.18s, transform 0.12s;
+      position: relative;
+      cursor: pointer;
+      min-width: 0;
+      user-select: none;
+      touch-action: pan-y;
+      will-change: transform;
+    }
+    .card:active, .card.swiping {
+      box-shadow: 0 8px 24px rgba(25, 118, 210, 0.14);
+      transform: scale(0.97);
+    }
+    .card .img-wrap {
+      width: 100%;
+      aspect-ratio: 1.8/1;
+      background: #ede7f6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+    .card .img-wrap img {
+      object-fit: cover;
+      width: 100%;
+      height: 100%;
+      display: block;
+      transition: transform 0.28s;
+    }
+    .card .content {
+      padding: 1rem 1rem 0.5rem 1rem;
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+    }
+    .card .title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.34rem;
+      line-height: 1.2;
+      max-height: 2.6em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .card .desc {
+      color: #555;
+      font-size: 0.97rem;
+      min-height: 2em;
+      margin-bottom: 0.7rem;
+      max-height: 3.2em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-clamp: 2;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .card .meta {
+      display: flex;
+      align-items: center;
+      gap: 0.7em;
+      font-size: 0.93rem;
+      color: #666;
+      margin-bottom: 0.8rem;
+    }
+    .card .category {
+      background: var(--accent);
+      color: #333;
+      border-radius: 8px;
+      padding: 0.15em 0.7em;
+      font-size: 0.85em;
+      font-weight: 500;
+    }
+    .card .play-indicator {
+      position: absolute;
+      right: 0.95rem;
+      top: 0.95rem;
+      z-index: 2;
+      width: 38px;
+      height: 38px;
+      background: rgba(25, 118, 210, 0.09);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
+    }
+    .pulse {
+      position: relative;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pulse-circle {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(25, 118, 210, 0.35);
+      animation: pulse 1.2s infinite cubic-bezier(.66,0,.34,1);
+      z-index: 1;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 0.62; }
+      80% { transform: scale(2.3); opacity: 0.09; }
+      100% { transform: scale(2.3); opacity: 0; }
+    }
+    .pulse-icon {
+      position: relative;
+      z-index: 2;
+      color: var(--primary);
+      font-size: 1.27rem;
+      display: inline-block;
+    }
+    .thumb-target {
+      min-height: 54px;
+      min-width: 54px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      outline: none;
+      border: none;
+      background: none;
+      cursor: pointer;
+      transition: background 0.16s;
+    }
+    .thumb-target:active, .thumb-target:focus {
+      background: #e3ecfa;
+    }
+    .no-episodes {
+      color: #888;
+      text-align: center;
+      margin: 3.5em 0 1em 0;
+      font-size: 1.15rem;
+      letter-spacing: 0.03em;
+    }
+    /* Mini Player */
+    .mini-player {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: var(--card-bg);
+      box-shadow: 0 -2px 18px rgba(0,0,0,0.10);
+      border-top-left-radius: 16px;
+      border-top-right-radius: 16px;
+      min-height: var(--mini-player-height);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 1em;
+      padding: 0.7em 1em 0.7em 1em;
+      transition: transform 0.2s;
+      max-width: 600px;
+      margin: 0 auto;
+      left: 0; right: 0;
+    }
+    .mini-player.hide {
+      transform: translateY(100%);
+      pointer-events: none;
+      opacity: 0;
+    }
+    .mini-player .mini-img {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      object-fit: cover;
+      margin-right: 0.7em;
+      background: #e3e3ed;
+      flex-shrink: 0;
+    }
+    .mini-player .mini-info {
+      flex: 1 1 60%;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .mini-player .mini-title {
+      font-size: 1.04rem;
+      font-weight: 500;
+      margin-bottom: 0.12rem;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .mini-player .mini-meta {
+      font-size: 0.82rem;
+      color: #666;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      overflow: hidden;
+    }
+    .mini-player .mini-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.4em;
+    }
+    .mini-player .mini-btn {
+      background: none;
+      border: none;
+      outline: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      color: var(--primary);
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      cursor: pointer;
+      transition: background 0.16s;
+    }
+    .mini-player .mini-btn:active, .mini-player .mini-btn:focus {
+      background: #e3ecfa;
+    }
+    .mini-player .mini-btn.close {
+      font-size: 1.4rem;
+      color: #888;
+      margin-left: 0.4em;
+    }
+    /* Hide scroll on mobile swipe */
+    .card.swipe-anim {
+      transition: transform 0.28s cubic-bezier(.65,.18,.48,1.09);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .card:hover .img-wrap img {
+        transform: scale(1.07);
+      }
+    }
+    /* Adjust for desktop */
+    @media (min-width: 800px) {
+      .mini-player {
+        left: auto;
+        right: 24px;
+        bottom: 18px;
+        max-width: 370px;
+        margin: 0;
+        border-radius: 18px;
+        box-shadow: 0 4px 32px rgba(25,118,210,0.13);
+      }
+    }
+  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<header>
+  🎧 Podcast Discovery
+</header>
+<div class="filters">
+  <input type="search" id="searchInput" placeholder="Search podcasts" autocomplete="off" aria-label="Search podcasts">
+  <select id="categoryFilter" aria-label="Filter by category">
+    <option value="">All Categories</option>
+  </select>
+  <select id="durationFilter" aria-label="Sort by duration">
+    <option value="">All Durations</option>
+    <option value="short">Short (&lt; 20 min)</option>
+    <option value="medium">Medium (20-40 min)</option>
+    <option value="long">Long (&gt; 40 min)</option>
+  </select>
+</div>
+<main>
+  <section class="cards-grid" id="episodesGrid">
+    <!-- Podcast episode cards rendered here -->
+  </section>
+  <div class="no-episodes" id="noEpisodesMsg" style="display:none;">
+    No episodes found. Try changing your filters.
+  </div>
+</main>
+<!-- Floating mini player -->
+<div class="mini-player hide" id="miniPlayer" role="region" aria-label="Playing episode">
+  <img src="" class="mini-img" id="miniImg" alt="Podcast cover" />
+  <div class="mini-info">
+    <div class="mini-title" id="miniTitle"></div>
+    <div class="mini-meta" id="miniMeta"></div>
+  </div>
+  <div class="mini-controls">
+    <button class="mini-btn" id="miniPlayPauseBtn" title="Play/Pause" aria-label="Play/Pause">
+      <!-- SVG injected -->
+    </button>
+    <button class="mini-btn close" id="miniCloseBtn" title="Close player" aria-label="Close player">
+      <!-- SVG X icon -->
+      <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" 
+        stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="6" x2="16" y2="16"/><line x1="16" y1="6" x2="6" y2="16"/></svg>
+    </button>
+    <audio id="miniAudio" preload="none"></audio>
+  </div>
+</div>
+<script>
+/*
+  Demo podcast data - replace with real API data as needed.
+  Each episode: { id, title, desc, img, audio, category, duration (sec) }
+*/
+const PODCAST_EPISODES = [
+  {
+    id: '1',
+    title: 'The Power of Curiosity',
+    desc: 'Explore how curiosity drives innovation and learning.',
+    img: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/10/16/audio_12cf0e7b0b.mp3',
+    category: 'Education',
+    duration: 750, // 12:30
+  },
+  {
+    id: '2',
+    title: 'Supercharge Your Productivity',
+    desc: 'Tips for making every day more productive and focused.',
+    img: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/10/16/audio_12cf0e7b0b.mp3',
+    category: 'Self-Improvement',
+    duration: 1420, // 23:40
+  },
+  {
+    id: '3',
+    title: 'The Art of Storytelling',
+    desc: 'Discover the secrets behind captivating narratives.',
+    img: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/03/15/audio_115b9d8e85.mp3',
+    category: 'Entertainment',
+    duration: 2520, // 42:00
+  },
+  {
+    id: '4',
+    title: 'Healthy Habits for Life',
+    desc: "Build habits that last and improve your well-being.",
+    img: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/11/16/audio_12b2c9932f.mp3',
+    category: 'Health',
+    duration: 1180, // 19:40
+  },
+  {
+    id: '5',
+    title: 'Tech Trends Explained',
+    desc: 'A breakdown of major tech trends and what they mean for you.',
+    img: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2023/05/31/audio_1455d5e2e2.mp3',
+    category: 'Technology',
+    duration: 950, // 15:50
+  },
+  {
+    id: '6',
+    title: 'Breaking Down World News',
+    desc: 'Stay informed with the latest news and analysis.',
+    img: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/03/15/audio_115b9d8e85.mp3',
+    category: 'News',
+    duration: 2080, // 34:40
+  },
+  {
+    id: '7',
+    title: 'The Science of Sleep',
+    desc: 'Why sleep is so important and how to improve yours.',
+    img: 'https://images.unsplash.com/photo-1464983953574-0892a716854b?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/07/26/audio_1233c2c665.mp3',
+    category: 'Health',
+    duration: 1860, // 31:00
+  },
+  {
+    id: '8',
+    title: 'Laugh Out Loud',
+    desc: 'Comedy sketches and fun interviews with comedians.',
+    img: 'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/11/16/audio_12b2c9932f.mp3',
+    category: 'Comedy',
+    duration: 1640, // 27:20
+  },
+  {
+    id: '9',
+    title: 'Mindfulness Minute',
+    desc: 'Guided meditations and mindfulness exercises.',
+    img: 'https://images.unsplash.com/photo-1444065381814-865dc9da92c0?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/03/15/audio_115b9d8e85.mp3',
+    category: 'Self-Improvement',
+    duration: 920, // 15:20
+  },
+  {
+    id: '10',
+    title: 'History’s Mysteries',
+    desc: 'Great unsolved mysteries and the stories behind them.',
+    img: 'https://images.unsplash.com/photo-1465101178521-c1a9136a3767?fit=crop&w=400&q=80',
+    audio: 'https://cdn.pixabay.com/audio/2022/07/26/audio_1233c2c665.mp3',
+    category: 'History',
+    duration: 2580, // 43:00
+  },
+];
+/* --- Category extraction --- */
+function getUniqueCategories(episodes) {
+  return [...new Set(episodes.map(e => e.category))].sort();
+}
+
+/* --- Format duration in mm:ss or hh:mm:ss --- */
+function formatDuration(sec) {
+  if (!isFinite(sec)) return '--:--';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${m}:${String(s).padStart(2, '0')}`;
+}
+
+/* --- Render filters --- */
+function renderFilters() {
+  const catSelect = document.getElementById('categoryFilter');
+  catSelect.innerHTML = '<option value="">All Categories</option>';
+  getUniqueCategories(PODCAST_EPISODES).forEach(cat => {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    catSelect.appendChild(opt);
+  });
+}
+renderFilters();
+
+/* --- Filtering logic --- */
+function filterEpisodes() {
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+  const cat = document.getElementById('categoryFilter').value;
+  const dur = document.getElementById('durationFilter').value;
+  return PODCAST_EPISODES.filter(ep => {
+    if (cat && ep.category !== cat) return false;
+    if (search && !ep.title.toLowerCase().includes(search) && !ep.desc.toLowerCase().includes(search)) return false;
+    if (dur === 'short' && ep.duration >= 20 * 60) return false;
+    if (dur === 'medium' && (ep.duration < 20 * 60 || ep.duration > 40 * 60)) return false;
+    if (dur === 'long' && ep.duration <= 40 * 60) return false;
+    return true;
+  });
+}
+
+/* --- Card render --- */
+function renderCards(episodes, playingId) {
+  const grid = document.getElementById('episodesGrid');
+  grid.innerHTML = '';
+  if (!episodes.length) {
+    document.getElementById('noEpisodesMsg').style.display = '';
+    return;
+  } else {
+    document.getElementById('noEpisodesMsg').style.display = 'none';
+  }
+  episodes.forEach(ep => {
+    const card = document.createElement('article');
+    card.className = 'card';
+    card.dataset.id = ep.id;
+    card.tabIndex = 0;
+    // Card swipe gesture data
+    card.dataset.swipe = "0";
+    // --- CARD IMAGE + PLAY INDICATOR ---
+    const imgWrap = document.createElement('div');
+    imgWrap.className = 'img-wrap';
+    const img = document.createElement('img');
+    img.src = ep.img;
+    img.alt = ep.title;
+    imgWrap.appendChild(img);
+    // Play/Pulse indicator
+    const playInd = document.createElement('div');
+    playInd.className = 'play-indicator thumb-target';
+    playInd.tabIndex = 0;
+    playInd.title = "Preview episode";
+    playInd.setAttribute('aria-label', 'Preview episode');
+
+    // Pulse animated SVG if this is currently playing
+    if (playingId === ep.id) {
+      playInd.innerHTML = `<span class="pulse">
+        <span class="pulse-circle"></span>
+        <span class="pulse-icon">
+          <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+            <polygon points="5,4 15,10 5,16" />
+          </svg>
+        </span>
+      </span>`;
+    } else {
+      playInd.innerHTML = `<span class="pulse-icon">
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 20 20">
+          <polygon points="5,4 15,10 5,16" />
+        </svg>
+      </span>`;
+    }
+    imgWrap.appendChild(playInd);
+    card.appendChild(imgWrap);
+    // --- CARD CONTENT ---
+    const content = document.createElement('div');
+    content.className = 'content';
+    const title = document.createElement('div');
+    title.className = 'title';
+    title.textContent = ep.title;
+    const desc = document.createElement('div');
+    desc.className = 'desc';
+    desc.textContent = ep.desc;
+    content.appendChild(title);
+    content.appendChild(desc);
+    // --- META INFO ---
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    const durSpan = document.createElement('span');
+    durSpan.innerHTML = `<svg width="16" height="16" style="position:relative;top:2px;margin-right:2px;" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6"/><line x1="8" y1="8" x2="11" y2="8"/><line x1="8" y1="8" x2="8" y2="4"/></svg>${formatDuration(ep.duration)}`;
+    meta.appendChild(durSpan);
+    const catSpan = document.createElement('span');
+    catSpan.className = 'category';
+    catSpan.textContent = ep.category;
+    meta.appendChild(catSpan);
+    content.appendChild(meta);
+    card.appendChild(content);
+    // --- CARD EVENTS ---
+    // Play preview on tap or hover
+    function previewHandler(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      playEpisode(ep.id);
+    }
+    playInd.addEventListener('click', previewHandler);
+    playInd.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') previewHandler(e);
+    });
+    // Desktop hover preview (for play indicator area only)
+    if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      playInd.addEventListener('mouseenter', previewHandler);
+    }
+    // Card also clickable
+    card.addEventListener('click', previewHandler);
+    card.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') previewHandler(e);
+    });
+    // --- SWIPE GESTURE HANDLING ---
+    addSwipeSupport(card, ep);
+    grid.appendChild(card);
+  });
+}
+
+/* --- SWIPE HANDLING (for mobile) --- */
+function addSwipeSupport(card, ep) {
+  let startX = 0, dx = 0, isSwiping = false, lock = false;
+  const threshold = 42; // px
+  card.addEventListener('touchstart', function(e) {
+    if (e.touches.length > 1) return;
+    lock = false;
+    startX = e.touches[0].clientX;
+    dx = 0;
+    isSwiping = true;
+    card.classList.remove('swipe-anim');
+  }, {passive:true});
+  card.addEventListener('touchmove', function(e) {
+    if (!isSwiping || lock) return;
+    dx = e.touches[0].clientX - startX;
+    // Only allow horizontal swipe
+    if (Math.abs(dx) > 8) {
+      card.style.transform = `translateX(${dx}px) scale(0.98)`;
+      card.classList.add('swiping');
+    }
+    // If swipe enough, lock and animate card out
+    if (Math.abs(dx) > threshold) {
+      lock = true;
+      card.classList.add('swipe-anim');
+      card.style.transform = `translateX(${dx > 0 ? 320 : -320}px) scale(0.96)`;
+      setTimeout(()=> {
+        isSwiping = false;
+        card.style.transform = '';
+        card.classList.remove('swiping');
+        card.classList.remove('swipe-anim');
+        // After swipe, play preview
+        playEpisode(ep.id);
+      }, 190);
+    }
+  }, {passive:true});
+  card.addEventListener('touchend', function(e) {
+    if (!isSwiping) return;
+    card.classList.remove('swiping');
+    card.classList.add('swipe-anim');
+    card.style.transform = '';
+    isSwiping = false;
+    setTimeout(()=>card.classList.remove('swipe-anim'), 210);
+  }, {passive:true});
+}
+
+/* --- Player state --- */
+let currentEpisodeId = null;
+let miniPlayerVisible = false;
+
+/* --- Play episode (preview) --- */
+function playEpisode(epId) {
+  if (currentEpisodeId === epId) {
+    // If already playing, pause
+    pausePlayer();
+    return;
+  }
+  currentEpisodeId = epId;
+  const ep = PODCAST_EPISODES.find(e => e.id === epId);
+  if (!ep) return;
+  // Setup mini player
+  showMiniPlayer(ep);
+  // Render cards with pulse indicator
+  renderCards(filterEpisodes(), currentEpisodeId);
+}
+
+/* --- Mini Player logic --- */
+const miniPlayer = document.getElementById('miniPlayer');
+const miniAudio = document.getElementById('miniAudio');
+const miniImg = document.getElementById('miniImg');
+const miniTitle = document.getElementById('miniTitle');
+const miniMeta = document.getElementById('miniMeta');
+const miniPlayPauseBtn = document.getElementById('miniPlayPauseBtn');
+const miniCloseBtn = document.getElementById('miniCloseBtn');
+
+function showMiniPlayer(ep) {
+  miniImg.src = ep.img;
+  miniImg.alt = ep.title;
+  miniTitle.textContent = ep.title;
+  miniMeta.textContent = `${formatDuration(ep.duration)} • ${ep.category}`;
+  miniAudio.src = ep.audio;
+  miniAudio.currentTime = 0;
+  miniAudio.play().catch(()=>{});
+  miniPlayer.classList.remove('hide');
+  miniPlayerVisible = true;
+  updateMiniPlayPauseBtn();
+}
+
+function updateMiniPlayPauseBtn() {
+  if (miniAudio.paused) {
+    miniPlayPauseBtn.innerHTML = `
+      <svg width="30" height="30" fill="currentColor" viewBox="0 0 32 32"><polygon points="12,8 24,16 12,24" /></svg>`;
+    miniPlayPauseBtn.title = "Play";
+    miniPlayPauseBtn.setAttribute('aria-label', 'Play');
+  } else {
+    miniPlayPauseBtn.innerHTML = `
+      <svg width="30" height="30" fill="currentColor" viewBox="0 0 32 32"><rect x="10" y="8" width="4" height="16" rx="1"/><rect x="18" y="8" width="4" height="16" rx="1"/></svg>`;
+    miniPlayPauseBtn.title = "Pause";
+    miniPlayPauseBtn.setAttribute('aria-label', 'Pause');
+  }
+}
+
+/* --- Pause/Close player --- */
+function pausePlayer() {
+  miniAudio.pause();
+  miniPlayer.classList.add('hide');
+  miniPlayerVisible = false;
+  currentEpisodeId = null;
+  renderCards(filterEpisodes(), null);
+}
+miniCloseBtn.addEventListener('click', pausePlayer);
+
+/* --- Play/Pause Button --- */
+miniPlayPauseBtn.addEventListener('click', function() {
+  if (miniAudio.paused) {
+    miniAudio.play();
+  } else {
+    miniAudio.pause();
+  }
+  updateMiniPlayPauseBtn();
+});
+miniAudio.addEventListener('play', updateMiniPlayPauseBtn);
+miniAudio.addEventListener('pause', updateMiniPlayPauseBtn);
+
+/* --- When audio ends --- */
+miniAudio.addEventListener('ended', pausePlayer);
+
+/* --- Auto-hide on scroll up (for mobile, optional) --- */
+/*
+let lastScrollY = window.scrollY;
+window.addEventListener('scroll', function() {
+  if (!miniPlayerVisible) return;
+  if (window.scrollY > lastScrollY && window.scrollY > 80) {
+    miniPlayer.style.transform = 'translateY(100%)';
+  } else {
+    miniPlayer.style.transform = '';
+  }
+  lastScrollY = window.scrollY;
+});
+*/
+
+/* --- Handle filter/search --- */
+['searchInput','categoryFilter','durationFilter'].forEach(id => {
+  document.getElementById(id).addEventListener('input', function() {
+    renderCards(filterEpisodes(), currentEpisodeId);
+  });
+});
+
+/* --- Initial render --- */
+renderCards(filterEpisodes(), null);
+</script>
+</body>
+</html>
